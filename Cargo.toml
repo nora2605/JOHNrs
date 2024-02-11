@@ -2,6 +2,11 @@
 name = "johnrs"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Simple library to parse the JOHN notation format"
+repository = "https://github.com/nora2605/JOHNrs"
+readme = "README.md"
+keywords = ["john", "notation", "parser"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

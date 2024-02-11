@@ -2,6 +2,40 @@ use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 use regex::Regex;
 
+pub fn stringify(input: &JohnValue) -> String {
+    match input {
+        JohnValue::JohnAbyss => "#".to_string(),
+        JohnValue::JohnBool(b) => b.to_string(),
+        JohnValue::JohnInt(i) => i.to_string(),
+        JohnValue::JohnFloat(f) => f.to_string(),
+        JohnValue::JohnString(s) => format!("\"{}\"", s),
+        JohnValue::JohnChar(c) => format!("'{}'", c),
+        JohnValue::JohnArray(a) => format!("[{}]", a.iter().map(|v| stringify(v)).collect::<Vec<String>>().join(", ")),
+        JohnValue::JohnObject(o) => format!("{{{}}}", o.iter().map(|(k, v)| format!("{}: {}", k, stringify(v))).collect::<Vec<String>>().join(", ")),
+        JohnValue::JohnTuple(t) => format!("({})", t.iter().map(|v| stringify(v)).collect::<Vec<String>>().join(", ")),
+        JohnValue::JohnRange(start, end, step) => {
+            if let Some(step) = step {
+                format!("{}..{}..{}", start, end, step)
+            } else {
+                format!("{}..{}", start, end)
+            }
+        }
+        JohnValue::JohnIndex(true, i) => format!("^{}", i),
+        JohnValue::JohnIndex(false, i) => format!("*{}", i),
+        JohnValue::JohnVersion(major, minor, patch, build) => {
+            if let Some(patch) = patch {
+                if let Some(build) = build {
+                    format!("v{}.{}.{}.{}", major, minor, patch, build)
+                } else {
+                    format!("v{}.{}.{}", major, minor, patch)
+                }
+            } else {
+                format!("v{}.{}", major, minor)
+            }
+        }
+    }
+}
+
 pub fn parse(input: &str) -> Result<JohnValue, String> {
     let tokens = tokenize(input);
     let mut parser = JohnParser::new(tokens);
@@ -490,5 +524,85 @@ mod tests {
                 )),
             ].into_iter().collect()
         )));
+    }
+
+    #[test]
+    fn test_value_object_nested_nested() {
+        assert_eq!(parse(r#"
+            {
+                a: 1,
+                b 2;
+                c [
+                    3,
+                    4
+                    { d: "hi" }
+                ], g (1 "2" 3),
+                h {
+                    i: 5,
+                    j 6
+                }
+            }
+        "#), Ok(JohnValue::JohnObject(
+            vec![
+                ("a".to_string(), JohnValue::JohnInt(1)),
+                ("b".to_string(), JohnValue::JohnInt(2)),
+                ("c".to_string(), JohnValue::JohnArray(
+                    vec![
+                        JohnValue::JohnInt(3),
+                        JohnValue::JohnInt(4),
+                        JohnValue::JohnObject(
+                            vec![
+                                ("d".to_string(), JohnValue::JohnString("hi".to_string())),
+                            ].into_iter().collect()
+                        ),
+                    ]
+                )),
+                ("g".to_string(), JohnValue::JohnTuple(
+                    vec![
+                        JohnValue::JohnInt(1),
+                        JohnValue::JohnString("2".to_string()),
+                        JohnValue::JohnInt(3),
+                    ]
+                )),
+                ("h".to_string(), JohnValue::JohnObject(
+                    vec![
+                        ("i".to_string(), JohnValue::JohnInt(5)),
+                        ("j".to_string(), JohnValue::JohnInt(6)),
+                    ].into_iter().collect()
+                )),
+            ].into_iter().collect()
+        )));
+    }
+
+    #[test]
+    fn test_stringify() {
+        assert_eq!(stringify(&JohnValue::JohnInt(1)), "1".to_string());
+        assert_eq!(stringify(&JohnValue::JohnFloat(1.25)), "1.25".to_string());
+        assert_eq!(stringify(&JohnValue::JohnString("hello".to_string())), r#""hello""#.to_string());
+        assert_eq!(stringify(&JohnValue::JohnChar('a')), r#"'a'"#.to_string());
+        assert_eq!(stringify(&JohnValue::JohnBool(true)), "true".to_string());
+        assert_eq!(stringify(&JohnValue::JohnBool(false)), "false".to_string());
+        assert_eq!(stringify(&JohnValue::JohnAbyss), "#".to_string());
+        assert_eq!(stringify(&JohnValue::JohnRange(1, 5, None)), "1..5".to_string());
+        assert_eq!(stringify(&JohnValue::JohnRange(1, 5, Some(2))), "1..5..2".to_string());
+        assert_eq!(stringify(&JohnValue::JohnIndex(false, 1)), "*1".to_string());
+        assert_eq!(stringify(&JohnValue::JohnIndex(true, 1)), "^1".to_string());
+        assert_eq!(stringify(&JohnValue::JohnVersion(1, 2, None, None)), "v1.2".to_string());
+        assert_eq!(stringify(&JohnValue::JohnVersion(1, 2, Some(3), None)), "v1.2.3".to_string());
+        assert_eq!(stringify(&JohnValue::JohnVersion(1, 2, Some(3), Some(4)),), "v1.2.3.4".to_string());
+        assert_eq!(stringify(&JohnValue::JohnArray(
+            vec![
+                JohnValue::JohnInt(1),
+                JohnValue::JohnInt(2),
+                JohnValue::JohnInt(3),
+            ]
+        )), "[1, 2, 3]".to_string());
+        assert_eq!(stringify(&JohnValue::JohnTuple(
+            vec![
+                JohnValue::JohnInt(1),
+                JohnValue::JohnInt(2),
+                JohnValue::JohnInt(3),
+            ]
+        )), "(1, 2, 3)".to_string());
     }
 }
